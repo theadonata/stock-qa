@@ -1,2 +1,17 @@
+# Shared baseline — kept identical across all stock-* repos, see CLAUDE.md
 .env
+.env.local
 .claude/settings.local.json
+
+# Repo-specific — Python (api-tests/)
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Repo-specific — Node/Playwright (e2e/)
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
