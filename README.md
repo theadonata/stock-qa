@@ -3,7 +3,7 @@
 Test plans and test automation for the Stock/HPP business-finance project.
 
 Part of the `stock-*` multi-repo project. See CLAUDE.md for scope and
-sibling-repo relationships. Not yet pushed to GitHub.
+sibling-repo relationships.
 
 This repo holds two independent black-box test suites that exercise the
 *deployed/running* outputs of the sibling repos over the network — never
