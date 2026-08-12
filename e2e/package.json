@@ -1,0 +1,14 @@
+{
+  "name": "stock-qa-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright E2E tests that exercise a deployed stock-frontend instance as a black box.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install-browsers": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}

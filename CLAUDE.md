@@ -1,0 +1,68 @@
+# CLAUDE.md
+
+This is the **QA/testing** repo for the Stock/HPP business-finance project.
+
+## Project status
+
+Test tooling chosen: pytest + httpx for API tests (against `stock-backend`),
+Playwright for E2E tests (against the deployed `stock-frontend`). See
+`stock-business-analyst/docs/superpowers/specs/2026-08-12-stack-architecture-design.md`
+for the full design.
+
+## Relationship to sibling repos
+
+This project is split across independent repos, each buildable and
+deployable on its own with no shared code or path dependency between them:
+
+- `stock-frontend` — client-side UI
+- `stock-backend` — API / business logic / data layer
+- `stock-infrastructure` — CI/CD, deployment, IaC
+- `stock-qa` (this repo) — test plans, test automation
+- `stock-business-analyst` — requirements, specs, source material (incl. the original HPP/business-finance notes)
+
+Tests here target the other repos' deployed/published outputs (API
+endpoints, built UI), not their source trees directly, so this repo never
+needs to be co-located with them.
+
+## Working here
+
+`.claude/` config (agents, hooks, skills, MCP) is kept identical across all
+five repos on purpose, so any agent persona works the same way regardless of
+which repo it's invoked in. Once a stack is chosen, update this file with
+real test/run commands.
+
+## Git
+
+Do not commit changes in this repo automatically — even when using
+atomic-commit or similar workflows. Only commit when the user explicitly
+asks for it.
+
+## Code style
+
+Always put comments in code so it is understandable by a human reader —
+explain what each test verifies and why, not just restate the assertions.
+
+## Environment files
+
+Always use `.env.local` for local config — never create or reintroduce a
+`.env.example`/`.env.sample` template file. `.env.local` already exists in
+this repo (gitignored) and holds the real placeholder values directly; if a
+new env var is needed, add it straight to `.env.local` (with a comment
+explaining it) rather than adding a separate example file for someone to
+copy from.
+
+## Gitignore
+
+Always ensure a `.gitignore` exists in this repo — never let it be
+deleted or skipped when scaffolding. It has two parts:
+
+- A **shared baseline** kept identical (word-for-word) across all five
+  `stock-*` repos: `.env`, `.env.local`, `.claude/settings.local.json`. If
+  you add an entry to this shared baseline in any one repo, add the same
+  line to the other four repos' `.gitignore` files too, so they stay in
+  sync.
+- **Repo-specific entries** below the baseline (this repo has both a
+  Python section — `__pycache__/`, `.venv/` — and a Node/Playwright
+  section — `node_modules/`, `test-results/`, `playwright-report/` — since
+  it holds two independent test suites) — these are expected to differ
+  per repo's tooling and should NOT be copied to siblings.
