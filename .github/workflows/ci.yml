@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  api-tests:
+    name: API smoke tests (pytest)
+    runs-on: ubuntu-latest
+    # api-tests exercise a live stock-backend instance as a black box.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stock
+          POSTGRES_PASSWORD: stock
+          POSTGRES_DB: stock
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U stock"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout stock-qa
+        uses: actions/checkout@v4
+
+      - name: Checkout stock-backend
+        uses: actions/checkout@v4
+        with:
+          repository: theadonata/stock-backend
+          path: stock-backend
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install and start stock-backend
+        working-directory: stock-backend
+        env:
+          DATABASE_URL: postgresql://stock:stock@localhost:5432/stock
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          alembic upgrade head
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/docs && break || sleep 2; done
+
+      - name: Install api-tests dependencies
+        working-directory: api-tests
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Run API tests
+        working-directory: api-tests
+        env:
+          BASE_URL: http://localhost:8000
+        run: pytest -m smoke
+
+  e2e-tests:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout stock-qa
+        uses: actions/checkout@v4
+
+      - name: Checkout stock-backend
+        uses: actions/checkout@v4
+        with:
+          repository: theadonata/stock-backend
+          path: stock-backend
+
+      - name: Checkout stock-frontend
+        uses: actions/checkout@v4
+        with:
+          repository: theadonata/stock-frontend
+          path: stock-frontend
+
+      - name: Start backend + frontend via docker compose
+        run: |
+          docker build -t stock-backend:ci ./stock-backend
+          docker build -t stock-frontend:ci ./stock-frontend
+          docker network create stock-ci || true
+          docker run -d --name stock-backend --network stock-ci -p 8000:8000 stock-backend:ci
+          docker run -d --name stock-frontend --network stock-ci -p 8080:80 stock-frontend:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:8080 && break || sleep 2; done
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        env:
+          BASE_URL: http://localhost:8080
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+  sonarcloud:
+    name: SonarCloud analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  dependency-review:
+    name: Dependency scanning (Dependabot / dependency review)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
