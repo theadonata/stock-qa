@@ -1,46 +1,65 @@
 # stock-qa
 
-Test plans and test automation for the Stock/HPP business-finance project.
+> Automated tests that check the Stock/HPP app actually works.
 
-Part of the `stock-*` multi-repo project. See CLAUDE.md for scope and
-sibling-repo relationships.
+## About the project
 
-This repo holds two independent black-box test suites that exercise the
-*deployed/running* outputs of the sibling repos over the network — never
-their source trees:
+**Stock/HPP** is a small web app that replaces an Excel spreadsheet for
+tracking a small business's sales, stock, expenses, and cost of goods
+sold. It's split across several repos — this one holds the tests that
+check the other pieces behave correctly, from the outside, the same way a
+real user or a real API client would.
 
-- **`api-tests/`** — pytest + httpx tests against a running `stock-backend`
-  instance (its HTTP API).
-- **`e2e/`** — Playwright end-to-end tests against a running `stock-frontend`
-  instance (the built SPA, loaded in a real browser).
+Nothing in here starts the app itself. These tests point at an *already
+running* backend and/or frontend (started from their own repos) and poke
+at them over the network — they never read those repos' source code.
 
-This repo does **not** start `stock-backend` or `stock-frontend` itself.
-Each of those repos owns its own `Dockerfile` and `docker-compose.yml` for
-local dev (see the design spec). Start them there first, then point these
-test suites at the running instances via env vars.
+### Part of a bigger project
 
-## Running the API tests (pytest + httpx)
+Stock/HPP is split into six repos, each one buildable and deployable on
+its own:
 
-Requires Python 3.11+.
+| Repo | What it does |
+|---|---|
+| [stock-frontend](https://github.com/theadonata/stock-frontend) | The web app people use day to day |
+| [stock-backend](https://github.com/theadonata/stock-backend) | The API and database — stores data, does the math |
+| [stock-infrastructure](https://github.com/theadonata/stock-infrastructure) | Deploys and runs everything on a server |
+| **stock-qa** (this repo) | Automated tests that check everything works |
+| [stock-business-analyst](https://github.com/theadonata/stock-business-analyst) | The original business requirements this is built from |
+| [stock-platform](https://github.com/theadonata/stock-platform) | An internal dashboard for the team building this project |
+
+## What's here
+
+Two independent test suites:
+
+- **`api-tests/`** — tests the backend's HTTP API directly (pytest + httpx)
+- **`e2e/`** — tests the frontend in a real browser, clicking around like a
+  user would ([Playwright](https://playwright.dev/))
+
+## Getting started
+
+### Running the API tests
+
+Requires Python 3.11+, and a running
+[stock-backend](https://github.com/theadonata/stock-backend) instance.
 
 ```bash
 cd api-tests
-python -m venv .venv && source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+python -m venv .venv && source .venv/bin/activate   # .venv\Scripts\activate on Windows
 pip install -e .
 
-# Point at a running stock-backend instance (defaults to
-# http://localhost:8000, a typical local docker-compose port, if unset).
-export API_BASE_URL=http://localhost:8000
+export API_BASE_URL=http://localhost:8000   # wherever your backend is running
 
 pytest
 ```
 
-If no backend is reachable at `API_BASE_URL`, the tests skip themselves
-(rather than error) so the suite stays runnable without a live backend.
+If no backend is reachable at that address, the tests skip themselves
+instead of failing — so the suite still runs fine without one.
 
-## Running the E2E tests (Playwright)
+### Running the E2E tests
 
-Requires Node.js 18+.
+Requires Node.js 18+, and a running
+[stock-frontend](https://github.com/theadonata/stock-frontend) instance.
 
 ```bash
 cd e2e
@@ -50,20 +69,9 @@ npx playwright install   # downloads browser binaries, first run only
 npm test
 ```
 
-Defaults to `http://localhost:8080`, matching `stock-frontend`'s own
-docker-compose port, so no env var needs to be set for the common case.
-Only override `BASE_URL` when pointing at something else (e.g. a Vite dev
-server on `5173`, or a staging URL):
+Defaults to `http://localhost:8080` (stock-frontend's usual Docker port).
+Point it elsewhere with `BASE_URL`:
 
 ```bash
 BASE_URL=http://localhost:5173 npm test
 ```
-
-These tests require a real, reachable `stock-frontend` instance — start
-`stock-frontend`'s own docker-compose (or `npm run dev`/`preview`) setup
-first, per that repo's own README/CLAUDE.md.
-
-## Design reference
-
-See `stock-business-analyst/docs/superpowers/specs/2026-08-12-stack-architecture-design.md`
-for the full stack/testing-strategy design that these suites implement.
